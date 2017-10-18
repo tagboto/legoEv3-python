@@ -1,31 +1,41 @@
 #!/usr/bin/env python3
+#Writen by Zoe Tagboto, Benedict Quartey and Brenda Mboya
+
 import ev3dev.ev3 as ev3
 import library
 from time import sleep
+
+#We used this to implement threading 
 from threading import Thread
 
-camera = ev3.Sensor(address=ev3.INPUT_4)
-btn = ev3.Button() 
-us = ev3.UltrasonicSensor() 
+#Importing the various sensors used by our robot
+camera = ev3.Sensor(address=ev3.INPUT_4) #Importing the pixycam
+btn = ev3.Button() #Importing the button which was used to start and stop the program
+us = ev3.UltrasonicSensor() #importing the ultrasonc sensor to measure distance
+
 assert us.connected, "Connect a single US sensor to any sensor port"
 assert camera.connected,  "Error while connecting Pixy camera to port 4"
 
 # Put the US sensor into distance mode.
 us.mode='US-DIST-CM'
-
-CAMERA_WIDTH_PIXELS = 255
-CAMERA_HEIGHT_PIXELS = 255
 units = us.units # reports 'cm' even though the sensor measures 'mm'
 
+#The pixels in the camera
+CAMERA_WIDTH_PIXELS = 255
+CAMERA_HEIGHT_PIXELS = 255
 
+
+#These are the threads we declare them globally so we can end the threads easily
 global wander
 global approach
 global avoid
+
+#Because with threading we couldn't reference sensors in multiple sensors we made global variables. 
 global distance
 global x,y,w,h
 global objCount
 
-
+# We made wander and avoid our main functions so they are the default actions or robot takes 
 wander = True
 approach = False
 avoid = True
@@ -41,7 +51,8 @@ h = camera.value(4)
 objCount = camera.value(0)
 
 
-
+# This function is what we call the avoid thread. It avoids an obstacle that is not green and moves
+# a certain distance away.
 def avoidObstacle():
     global avoid
     global approach
@@ -56,19 +67,22 @@ def avoidObstacle():
                 library.turnRight(90,200)
                 library.moveForward(20,200)
             else:
+               #If the object is green or the distance is not less than D it turns off
+                #this thread and switches on approach
                 wander = False
                 approach=True
 
-def setCameraMode():
+def setCameraMode(): #This sets the camera to look for green
     camera.mode = 'SIG1'
 
+#This function approaches a green object and stops a certain distance away.
 def approachObj():
     global approach
     global wander
     while (not btn.any()):
         if approach==True:
-            if objCount > 0:
-                if(x < CAMERA_WIDTH_PIXELS/2 - w/2):
+            if objCount > 0: #If there is more than one green object seen by the pixycam
+                if(x < CAMERA_WIDTH_PIXELS/2 - w/2): #Checks if object is to the left of camera
                     print("  Object is to my left.")
                     library.stopMotors()
                     library.turning(0,200)
@@ -79,42 +93,42 @@ def approachObj():
                     library.turning(200,0)
 
                 else:
-                    if(distance>D):
+                    if(distance>D): #If the object is too far away the robot drives towards it
                         library.stopMotors()
                         library.runForever(200)
                     else:
-                        print("  Object is approximately in front of me.") #Checks if the object is infront of the camera
-                        ev3.Sound.beep()
+                        print("  Object is approximately in front of me.") 
+                        ev3.Sound.beep() #Beeps when the object is the specified distance and beeps.
                         library.stopMotors()
                         sleep(5)
                     
-            else:
+            else:# If a green object not found it stops this thread and runs wander
                 wander=True
                 approach = False
                 
                 
   
 
-def wanderTillCenter():
+def wanderTillCenter(): #This functionn wanders till a green object is found
     global approach
     global wander
     global distance
   
     while (not btn.any()):
         if wander == True :
-            if objCount > 0: 
-                print("Now going to approach object") #Checks if the object is infront of the camera
+            if objCount > 0: # Checks If a green object is found
+                print("Found a green object") 
                 ev3.Sound.beep()
                 library.stopMotors()
                 approach =True
                 wander = False
                 
             
-            elif objCount==0:
+            elif objCount==0: #If not found, turns until it is found
               library.turning(500,0)
 
         
-            
+#This was done to chnage our individual functions to threads.           
 wanderThread =  Thread(target=wanderTillCenter)
 wanderThread.start()
 approachThread =  Thread(target=approachObj)  
@@ -122,7 +136,7 @@ approachThread.start()
 avoidThread = Thread(target=avoidObstacle)
 avoidThread.start()
 
-
+#This is our main function 
 def main():
     global wander
     global approach
@@ -131,7 +145,7 @@ def main():
     global x,y,w,h
     global objCount
     
-    print("Hi")
+    print("Looking for green......")
     setCameraMode()
     while (not btn.any()):
     
